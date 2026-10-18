@@ -650,8 +650,24 @@ INDEX_HTML = r"""<!DOCTYPE html>
       <a class="btn btn-sm btn-success" href="WanGP_Colab_Free_GPU.ipynb" download="WanGP_Colab_Free_GPU.ipynb">
         ⚡ Download Free Colab GPU Launcher (.ipynb)
       </a>
+      <a class="btn btn-sm" id="openNewWinBtn" href="." target="_blank" rel="noopener" onclick="window.open(window.location.href, '_blank'); return false;" style="background:linear-gradient(135deg,#6366f1,#ec4899); font-weight:700;">
+        ↗ Open in New Window
+      </a>
     </div>
   </header>
+
+  <!-- Iframe Fullscreen New-Window Prompt Banner -->
+  <div id="iframeBanner" style="display:none; background:linear-gradient(90deg, rgba(99,102,241,0.22), rgba(236,72,153,0.22)); border-bottom:1px solid var(--accent); padding:9px 18px; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
+    <div style="font-size:0.86rem; font-weight:600;">
+      🖥️ Want the full-screen Studio view? Click the button to launch the WanGP Dashboard in its own browser window/tab:
+    </div>
+    <div style="display:flex; gap:8px; align-items:center;">
+      <a class="btn btn-sm" href="." target="_blank" rel="noopener" onclick="window.open(window.location.href, '_blank'); return false;" style="background:var(--accent); font-weight:700; padding:7px 14px;">
+        ↗ Launch Fullscreen in New Window
+      </a>
+      <button class="btn btn-sm btn-secondary" onclick="document.getElementById('iframeBanner').style.display='none'">✕ Dismiss</button>
+    </div>
+  </div>
 
   <!-- Navigation Tabs -->
   <nav class="nav-tabs">
@@ -1187,6 +1203,22 @@ let galleryItems = [
 ];
 
 async function initApp() {
+  // Detect if running inside an embedded preview iframe and offer/trigger new-window launch
+  try {
+    if (window.self !== window.top) {
+      const banner = document.getElementById('iframeBanner');
+      if (banner) banner.style.display = 'flex';
+      // Attempt automatic open in new tab/window (if browser popup policy permits)
+      const w = window.open(window.location.href, '_blank');
+      if (w) {
+        w.focus();
+      }
+    }
+  } catch (e) {
+    const banner = document.getElementById('iframeBanner');
+    if (banner) banner.style.display = 'flex';
+  }
+
   const [mRes, pRes, dRes] = await Promise.all([
     fetch('api/models').then(r => r.json()),
     fetch('api/plugins').then(r => r.json()),
