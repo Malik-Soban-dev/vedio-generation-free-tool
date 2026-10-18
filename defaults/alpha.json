@@ -1,0 +1,19 @@
+{
+	"model":
+	{
+		"name": "Wan2.1 Alpha v1.0 14B",
+		"architecture" : "alpha",
+		"description": "This model generates transparent scenes with semi-transparent objects, glowing effects, and fine details such as hair. A checkerboard video previews the result. Choose RGBA PNG frames in a ZIP (default) or a ProRes 4444 MOV companion in Configuration / Outputs / RGBA Video Output.",
+		"URLs": "t2v",
+		"preload_URLs": [
+			"https://huggingface.co/DeepBeepMeep/Wan2.1/resolve/main/wan_alpha_2.1_vae_rgb_channel.safetensors", 
+			"https://huggingface.co/DeepBeepMeep/Wan2.1/resolve/main/wan_alpha_2.1_vae_alpha_channel.safetensors"
+			],
+		"loras": [ 
+			"https://huggingface.co/DeepBeepMeep/Wan2.1/resolve/main/wan_alpha_2.1_dora.safetensors"
+			],		
+		"loras_multipliers": [ 1 ]	
+	},
+	"prompt": "A large orange octopus is seen resting. The background of the video is transparent."
+	
+}
