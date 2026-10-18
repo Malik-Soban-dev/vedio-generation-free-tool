@@ -620,6 +620,7 @@ INDEX_HTML = r"""<!DOCTYPE html>
 </style>
 </head>
 <body>
+<!--__WANGP_INLINE_DATA__-->
 
   <!-- Top Header -->
   <header class="topbar">
@@ -647,36 +648,30 @@ INDEX_HTML = r"""<!DOCTYPE html>
         <option value="cyber">🎨 Theme: Cyber Neon</option>
         <option value="gradio">🎨 Theme: Classic Gradio</option>
       </select>
-      <a class="btn btn-sm btn-success" href="WanGP_Colab_Free_GPU.ipynb" download="WanGP_Colab_Free_GPU.ipynb">
+      <a class="btn btn-sm btn-success" href="https://raw.githubusercontent.com/Malik-Soban-dev/vedio-generation-free-tool/arena/f01df44c-vedio-generation-free-tool/WanGP_Colab_Free_GPU.ipynb" target="_blank" rel="noopener">
         ⚡ Download Free Colab GPU Launcher (.ipynb)
       </a>
-      <button class="btn btn-sm btn-secondary" onclick="toggleFullScreen()" title="Expand preview to fill your screen">
+      <button class="btn btn-sm btn-secondary" onclick="toggleFullScreen()" title="Expand the preview to fill your whole screen">
         ⛶ Fullscreen
       </button>
-      <button class="btn btn-sm btn-secondary" id="copyUrlBtn" onclick="copyDirectUrl()">
-        📋 Copy Direct URL
-      </button>
-      <a class="btn btn-sm" id="openNewWinBtn" href="https://7860-ippiwodbnc65hypshhaui.e2b.app/" target="_blank" rel="noopener noreferrer" style="background:linear-gradient(135deg,#6366f1,#ec4899); font-weight:700;">
-        ↗ Open in New Tab
+      <a class="btn btn-sm" href="WanGP_Studio_Standalone.html" download="WanGP_Studio_Standalone.html" target="_blank" rel="noopener" style="background:linear-gradient(135deg,#6366f1,#ec4899); font-weight:700;">
+        ⬇️ Download Offline HTML (opens in any browser)
       </a>
     </div>
   </header>
 
-  <!-- Iframe Fullscreen & Direct Link Banner -->
+  <!-- Why there is no public URL: sandbox traffic-access-token notice -->
   <div id="iframeBanner" style="display:none; background:linear-gradient(90deg, rgba(99,102,241,0.22), rgba(236,72,153,0.22)); border-bottom:1px solid var(--accent); padding:9px 18px; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-    <div style="font-size:0.84rem; font-weight:600; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-      <span>🖥️ <b>Full Window URL:</b></span>
-      <input type="text" id="directUrlInput" value="https://7860-ippiwodbnc65hypshhaui.e2b.app/" readonly onclick="this.select()" style="width:320px; padding:4px 8px; font-size:0.8rem; font-family:monospace; background:#090d16; color:#6ee7b7; border:1px solid var(--accent);" />
+    <div style="font-size:0.84rem; line-height:1.45;">
+      🔒 <b>This workspace sandbox is private.</b> Its public URL is protected by an E2B <b>traffic-access-token</b>, so opening <code>https://7860-…e2b.app</code> directly in a new tab returns <b>403 — missing traffic token</b>.
+      Use <b>⛶ Fullscreen</b> here, or download the <b>offline HTML</b> to open the full dashboard in any browser with zero server.
     </div>
     <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
       <button class="btn btn-sm" onclick="toggleFullScreen()" style="background:var(--accent-2); color:#052e16; font-weight:700;">
         ⛶ Expand Fullscreen Here
       </button>
-      <button class="btn btn-sm btn-secondary" id="bannerCopyBtn" onclick="copyDirectUrl()">
-        📋 Copy URL
-      </button>
-      <a class="btn btn-sm" id="bannerOpenLink" href="https://7860-ippiwodbnc65hypshhaui.e2b.app/" target="_blank" rel="noopener noreferrer" style="background:var(--accent); font-weight:700;">
-        ↗ Open in New Tab
+      <a class="btn btn-sm" href="WanGP_Studio_Standalone.html" download="WanGP_Studio_Standalone.html" target="_blank" rel="noopener" style="background:var(--accent); font-weight:700;">
+        ⬇️ Download Offline HTML
       </a>
       <button class="btn btn-sm btn-secondary" onclick="document.getElementById('iframeBanner').style.display='none'">✕</button>
     </div>
@@ -1216,14 +1211,7 @@ let galleryItems = [
 ];
 
 async function initApp() {
-  const currentUrl = window.location.href;
-  const openBtn = document.getElementById('openNewWinBtn');
-  const bannerLink = document.getElementById('bannerOpenLink');
-  const urlInput = document.getElementById('directUrlInput');
-  if (openBtn) openBtn.href = currentUrl;
-  if (bannerLink) bannerLink.href = currentUrl;
-  if (urlInput) urlInput.value = currentUrl;
-
+  // Show the "sandbox is private / use Fullscreen" hint when embedded in the preview iframe
   try {
     if (window.self !== window.top) {
       const banner = document.getElementById('iframeBanner');
@@ -1234,11 +1222,19 @@ async function initApp() {
     if (banner) banner.style.display = 'flex';
   }
 
-  const [mRes, pRes, dRes] = await Promise.all([
-    fetch('api/models').then(r => r.json()),
-    fetch('api/plugins').then(r => r.json()),
-    fetch('api/docs').then(r => r.json())
-  ]);
+  let mRes, pRes, dRes;
+  if (window.__WANGP_DATA__) {
+    // Offline / standalone mode: every byte of real repo data is baked into this file
+    mRes = { models: window.__WANGP_DATA__.models || [] };
+    pRes = { plugins: window.__WANGP_DATA__.plugins || [] };
+    dRes = { docs: window.__WANGP_DATA__.docs || [] };
+  } else {
+    [mRes, pRes, dRes] = await Promise.all([
+      fetch('api/models').then(r => r.json()),
+      fetch('api/plugins').then(r => r.json()),
+      fetch('api/docs').then(r => r.json())
+    ]);
+  }
   MODELS = mRes.models || [];
   PLUGINS = pRes.plugins || [];
   DOCS = dRes.docs || [];
@@ -1264,31 +1260,6 @@ function toggleFullScreen() {
     if (document.exitFullscreen) {
       document.exitFullscreen().catch(() => {});
     }
-  }
-}
-
-function copyDirectUrl() {
-  const url = window.location.href;
-  const input = document.getElementById('directUrlInput');
-  if (input) {
-    input.value = url;
-    input.select();
-  }
-  if (navigator.clipboard && navigator.clipboard.writeText) {
-    navigator.clipboard.writeText(url).then(() => {
-      const b1 = document.getElementById('copyUrlBtn');
-      const b2 = document.getElementById('bannerCopyBtn');
-      if (b1) b1.textContent = '✅ Copied URL!';
-      if (b2) b2.textContent = '✅ Copied!';
-      setTimeout(() => {
-        if (b1) b1.textContent = '📋 Copy Direct URL';
-        if (b2) b2.textContent = '📋 Copy URL';
-      }, 2200);
-    }).catch(() => {
-      document.execCommand('copy');
-    });
-  } else {
-    document.execCommand('copy');
   }
 }
 
@@ -1844,6 +1815,11 @@ function renderDocList() {
 async function loadDoc(docId, btn) {
   document.querySelectorAll('.doc-item').forEach(el => el.classList.remove('active'));
   if (btn) btn.classList.add('active');
+  const inline = window.__WANGP_DATA__ && window.__WANGP_DATA__.docsContent;
+  if (inline && Object.prototype.hasOwnProperty.call(inline, docId)) {
+    document.getElementById('docContent').textContent = inline[docId] || 'Empty document.';
+    return;
+  }
   const res = await fetch('api/doc?id=' + encodeURIComponent(docId)).then(r => r.json());
   document.getElementById('docContent').textContent = res.content || 'Empty document.';
 }
@@ -1851,6 +1827,37 @@ async function loadDoc(docId, btn) {
 </body>
 </html>
 """
+
+
+def load_all_doc_contents():
+    """Read every documentation file so the standalone HTML works fully offline."""
+    contents = {}
+    for d in ALL_DOCS:
+        full_path = os.path.join(ROOT_DIR, d["path"])
+        try:
+            with open(full_path, "r", encoding="utf-8", errors="replace") as f:
+                contents[d["id"]] = f.read()
+        except Exception:
+            contents[d["id"]] = "(document could not be read)"
+    return contents
+
+
+def build_standalone_html():
+    """Bake every real model preset, plugin and doc into one self-contained HTML file."""
+    payload = {
+        "models": ALL_MODELS,
+        "plugins": ALL_PLUGINS,
+        "docs": ALL_DOCS,
+        "docsContent": load_all_doc_contents(),
+    }
+    inline = (
+        "<script>\n"
+        "/* Offline mode: 100% of the data below is read from the real WanGP repository "
+        "(defaults/*.json, plugins.json, docs/*.md, VIDEO_GENERATION_GUIDE.md). */\n"
+        "window.__WANGP_DATA__ = " + json.dumps(payload, ensure_ascii=False) + ";\n"
+        "</script>"
+    )
+    return INDEX_HTML.replace("<!--__WANGP_INLINE_DATA__-->", inline)
 
 
 class PreviewHandler(BaseHTTPRequestHandler):
@@ -1875,6 +1882,17 @@ class PreviewHandler(BaseHTTPRequestHandler):
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+            return
+
+        if path in ("/standalone", "/WanGP_Studio_Standalone.html"):
+            raw = build_standalone_html().encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "text/html; charset=utf-8")
+            self.send_header("Content-Length", str(len(raw)))
+            self.send_header("Content-Disposition",
+                             'attachment; filename="WanGP_Studio_Standalone.html"')
             self.end_headers()
             self.wfile.write(raw)
             return
