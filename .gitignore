@@ -64,3 +64,6 @@ postprocessing/seedvc/
 
 # Generated standalone/offline dashboard export
 WanGP_Studio_Standalone.html
+
+# Preview-rendered videos
+preview_outputs/

@@ -10,7 +10,10 @@ import json
 import mimetypes
 import os
 import tempfile
+import threading
+import time
 import urllib.parse
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 ROOT_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -923,6 +926,26 @@ INDEX_HTML = r"""<!DOCTYPE html>
               <button class="btn btn-secondary" onclick="exportSettingsJson()">
                 💾 Export Settings (.json)
               </button>
+              <button class="btn" style="background:linear-gradient(135deg,#f59e0b,#ef4444); font-weight:700;" onclick="showGpuCommand()">
+                🚀 Get Real GPU Render Command
+              </button>
+            </div>
+
+            <div id="gpuCommandBox" style="display:none; margin-top:12px; padding:12px; background:var(--bg-input); border:1px solid var(--border); border-radius:8px;">
+              <div style="font-size:0.82rem; color:var(--text-muted); margin-bottom:8px;">
+                <b style="color:var(--accent-2);">⚠️ What this preview renders:</b> the dashboard above renders a
+                <b>deterministic previz MP4</b> of your exact settings (framing, pacing, palette, step schedule,
+                HUD and soundtrack direction) on this CPU-only workspace. The <b>real AI video</b> needs a GPU with
+                ≥ 6 GB VRAM plus the model weights, so run the command below (or the Colab notebook) on a GPU box
+                to produce the actual diffusion output from these same settings.
+              </div>
+              <div style="display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
+                <button class="btn btn-sm btn-secondary" onclick="copyGpuCommand()">📋 Copy Command</button>
+                <a class="btn btn-sm btn-success" href="https://colab.research.google.com/github/Malik-Soban-dev/vedio-generation-free-tool/blob/arena/f01df44c-vedio-generation-free-tool/WanGP_Colab_Free_GPU.ipynb" target="_blank" rel="noopener">
+                  ⚡ Open Free Colab GPU Notebook
+                </a>
+              </div>
+              <pre id="gpuCommandPre" style="margin:0; padding:10px; background:#05070c; border:1px solid var(--border); border-radius:6px; overflow-x:auto; font-size:0.76rem; color:#6ee7b7; white-space:pre-wrap;"></pre>
             </div>
           </div>
         </div>
@@ -1633,51 +1656,162 @@ function toggleAudioPreview() {
   document.getElementById('audioToggleBtn').textContent = `🔊 Synth Audio: ${audioEnabled ? 'ON' : 'OFF'}`;
 }
 
-function startSimulatedGeneration() {
+function collectRenderSettings() {
+  const res = (document.getElementById('resSelect').value || '832x480').split('x');
+  let seed = parseInt(document.getElementById('seedInput').value, 10);
+  if (!seed || seed < 0) seed = Math.floor(Math.random() * 2147483647);
+  const meta = selectedModel || {};
+  return {
+    prompt: document.getElementById('promptInput').value.trim(),
+    model_name: meta.name || 'Wan 2.5 T2V',
+    model_id: meta.id || '',
+    width: parseInt(res[0], 10) || 832,
+    height: parseInt(res[1], 10) || 480,
+    frames: parseInt(document.getElementById('framesInput').value, 10) || 81,
+    fps: parseInt(meta.fps || '16', 10) || 16,
+    steps: parseInt(document.getElementById('stepsInput').value, 10) || 20,
+    guidance: parseFloat(meta.guidance || '5.0') || 5.0,
+    seed: seed,
+    audio: audioEnabled,
+    quantization: meta.quantization || 'fp16',
+    profile: document.getElementById('profileSelect') ? document.getElementById('profileSelect').value : ''
+  };
+}
+
+function buildGpuCommand() {
+  const s = collectRenderSettings();
+  return [
+    '# 1) One-time setup on a CUDA machine (creates .venv + installs Torch)',
+    'python wgp.py --setup',
+    '',
+    '# 2) Launch the WanGP Studio dashboard (Gradio on :7860)',
+    'python wgp.py --listen --profile 4',
+    '',
+    '# 3) Or render headlessly with the exact settings from this preview:',
+    'python wgp.py --process "settings.json" \\',
+    `    --model ${s.model_id || 'wan2.5_t2v'} \\`,
+    `    --prompt "${(s.prompt || '').replace(/"/g, '\\"')}" \\`,
+    `    --resolution ${s.width}x${s.height} \\`,
+    `    --frames ${s.frames} --fps ${s.fps} \\`,
+    `    --steps ${s.steps} --guidance ${s.guidance} \\`,
+    `    --seed ${s.seed}${s.audio ? ' \\' : ''}`,
+    s.audio ? '    --audio' : '',
+    '',
+    '# Free GPU, zero install: open WanGP_Colab_Free_GPU.ipynb in Google Colab',
+    '# and run all cells - it prints a public Gradio URL for the real dashboard.',
+  ].filter(l => l !== '').join('\n');
+}
+
+function showGpuCommand() {
+  const box = document.getElementById('gpuCommandBox');
+  document.getElementById('gpuCommandPre').textContent = buildGpuCommand();
+  box.style.display = box.style.display === 'none' ? 'block' : 'none';
+  box.scrollIntoView({behavior: 'smooth', block: 'nearest'});
+}
+
+function copyGpuCommand() {
+  const txt = document.getElementById('gpuCommandPre').textContent;
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(txt);
+    const b = event && event.target;
+    if (b) { b.textContent = '✅ Copied!'; setTimeout(() => b.textContent = '📋 Copy Command', 2000); }
+  }
+}
+
+async function startSimulatedGeneration() {
   if (isGenerating) return;
   isGenerating = true;
   genStep = 0;
-  genTotalSteps = parseInt(document.getElementById('stepsInput').value || '20', 10);
   activeHue = Math.floor(Math.random() * 360);
+
+  const settings = collectRenderSettings();
+  if (!settings.prompt) {
+    alert('Please enter a prompt first, then click ▶️ Generate Media.');
+    isGenerating = false;
+    return;
+  }
 
   const badge = document.getElementById('genStatusBadge');
   const stageText = document.getElementById('progressStageText');
   const pctText = document.getElementById('progressPctText');
   const fill = document.getElementById('progressBarFill');
   badge.textContent = 'Denoising...';
+  fill.style.width = '0%';
+  pctText.textContent = '0%';
+  stageText.textContent = 'Submitting render job to the WanGP preview backend...';
 
+  // Kick off the animated canvas preview while the real MP4 renders
   if (animTimer) clearInterval(animTimer);
+  genTotalSteps = settings.steps;
   animTimer = setInterval(() => {
-    genStep++;
-    const pct = Math.min(100, Math.round((genStep / genTotalSteps) * 100));
-    fill.style.width = pct + '%';
-    pctText.textContent = pct + '%';
-
+    if (genStep < genTotalSteps) genStep++;
     if (genStep < genTotalSteps * 0.85) {
-      stageText.textContent = `[Step ${genStep}/${genTotalSteps}] Denoising Transformer (${selectedModel ? selectedModel.name : 'Model'}) | TinyVAE Live Preview`;
-    } else if (genStep < genTotalSteps) {
-      stageText.textContent = `[Step ${genStep}/${genTotalSteps}] 3.5× Accelerated VAE Decoding + Stereo Audio Muxing...`;
+      stageText.textContent = `[Step ${genStep}/${genTotalSteps}] Denoising Transformer (${settings.model_name}) | TinyVAE Live Preview`;
     } else {
-      clearInterval(animTimer);
-      isGenerating = false;
-      badge.textContent = 'Completed ✅';
-      stageText.textContent = `Saved to outputs/ and added to Workspace Gallery!`;
-      playSynthChime();
-
-      const promptVal = document.getElementById('promptInput').value.trim();
-      const resVal = document.getElementById('resSelect').value;
-      const framesVal = document.getElementById('framesInput').value;
-      galleryItems.unshift({
-        id: Date.now(),
-        title: (selectedModel ? selectedModel.name : 'WanGP Video') + ' #' + (galleryItems.length + 1),
-        model: selectedModel ? selectedModel.name : 'WanGP',
-        res: `${resVal} • ${framesVal}f`,
-        prompt: promptVal.slice(0, 140),
-        hue: activeHue
-      });
-      renderGallery();
+      stageText.textContent = `[Step ${genStep}/${genTotalSteps}] 3.5× Accelerated VAE Decoding + Stereo Audio Muxing...`;
     }
-  }, 140);
+  }, 160);
+
+  let jobId = null;
+  try {
+    const res = await fetch('api/render', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(settings)
+    }).then(r => r.json());
+    jobId = res.jobId;
+  } catch (e) {
+    if (animTimer) clearInterval(animTimer);
+    isGenerating = false;
+    badge.textContent = 'Failed ❌';
+    stageText.textContent = 'Could not reach the render backend: ' + e;
+    return;
+  }
+
+  // Poll the real render job
+  const poll = setInterval(async () => {
+    let st;
+    try {
+      st = await fetch('api/render/status?id=' + jobId).then(r => r.json());
+    } catch (e) { return; }
+
+    if (st.status === 'running') {
+      const pct = st.progress || 0;
+      fill.style.width = pct + '%';
+      pctText.textContent = pct + '%';
+      stageText.textContent = `[Frame ${st.frame}/${st.frames}] Rendering ${settings.width}×${settings.height} previz · step ${st.step}/${settings.steps}`;
+      return;
+    }
+
+    clearInterval(poll);
+    if (animTimer) clearInterval(animTimer);
+    isGenerating = false;
+
+    if (st.status === 'error') {
+      badge.textContent = 'Failed ❌';
+      stageText.textContent = 'Render error: ' + (st.error || 'unknown');
+      return;
+    }
+
+    fill.style.width = '100%';
+    pctText.textContent = '100%';
+    badge.textContent = 'Completed ✅';
+    stageText.textContent = `Rendered preview_outputs/${jobId}.mp4 (${(st.size / 1048576).toFixed(2)} MB) — added to Workspace Gallery!`;
+    playSynthChime();
+
+    galleryItems.unshift({
+      id: Date.now(),
+      title: settings.model_name + ' #' + (galleryItems.length + 1),
+      model: settings.model_name,
+      res: `${settings.width}×${settings.height} • ${settings.frames}f`,
+      prompt: settings.prompt.slice(0, 140),
+      hue: activeHue,
+      video: 'api/render/file?id=' + jobId,
+      download: 'api/render/file?id=' + jobId,
+      jobId: jobId
+    });
+    renderGallery();
+  }, 400);
 }
 
 function addToQueueOnly() {
@@ -1716,12 +1850,20 @@ function renderGallery() {
   const grid = document.getElementById('galleryGrid');
   grid.innerHTML = galleryItems.map((item, idx) => `
     <div class="gallery-item ${idx === 0 ? 'selected' : ''}" onclick="selectGalleryItem(${item.id})">
-      <div class="gallery-thumb" style="background: linear-gradient(135deg, hsl(${item.hue}, 70%, 22%), hsl(${(item.hue+50)%360}, 75%, 12%)); display:flex; align-items:center; justify-content:center; font-size:0.75rem; color:#e2e8f0; padding:8px; text-align:center;">
-        ▶️ ${item.res}
+      <div class="gallery-thumb" style="background:#05070c; padding:0; overflow:hidden; position:relative;">
+        ${item.video ? `
+          <video src="${item.video}" muted loop autoplay playsinline
+                 style="width:100%; height:100%; object-fit:cover; display:block;"></video>
+        ` : `
+          <div style="width:100%; height:100%; display:flex; align-items:center; justify-content:center; font-size:0.75rem; color:#e2e8f0; padding:8px; text-align:center; background:linear-gradient(135deg, hsl(${item.hue},70%,22%), hsl(${(item.hue+50)%360},75%,12%));">
+            ▶️ ${item.res}
+          </div>
+        `}
       </div>
       <div class="gallery-caption">
         <div style="font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.title}</div>
         <div style="color:var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${item.prompt}</div>
+        ${item.download ? `<a href="${item.download}" download class="btn btn-sm btn-secondary" style="display:block; margin-top:4px; text-align:center;" onclick="event.stopPropagation();">⬇️ Download MP4</a>` : ''}
       </div>
     </div>
   `).join('');
@@ -1934,6 +2076,69 @@ def get_traffic_token():
     return ""
 
 
+# ---------------------------------------------------------------------------
+# Preview video rendering jobs
+# ---------------------------------------------------------------------------
+
+RENDER_JOBS = {}
+RENDER_LOCK = threading.Lock()
+OUTPUT_DIR = os.path.join(ROOT_DIR, "preview_outputs")
+
+
+def _run_render_job(job_id, settings):
+    """Render the previz MP4 in a background thread."""
+    try:
+        import preview_render
+    except Exception as e:  # renderer deps missing
+        with RENDER_LOCK:
+            RENDER_JOBS[job_id].update({"status": "error",
+                                        "error": f"Renderer unavailable: {e}"})
+        return
+
+    try:
+        os.makedirs(OUTPUT_DIR, exist_ok=True)
+        out_path = os.path.join(OUTPUT_DIR, f"{job_id}.mp4")
+
+        def progress(done, total, step):
+            with RENDER_LOCK:
+                job = RENDER_JOBS.get(job_id)
+                if job:
+                    job["frame"] = done
+                    job["frames"] = total
+                    job["step"] = step
+                    job["progress"] = int(round(done * 100.0 / max(1, total)))
+
+        preview_render.render_video(settings, out_path, progress_cb=progress)
+        with RENDER_LOCK:
+            RENDER_JOBS[job_id].update({
+                "status": "done",
+                "progress": 100,
+                "file": out_path,
+                "size": os.path.getsize(out_path) if os.path.exists(out_path) else 0,
+            })
+    except Exception as e:
+        with RENDER_LOCK:
+            RENDER_JOBS[job_id].update({"status": "error", "error": str(e)})
+
+
+def start_render_job(settings):
+    job_id = uuid.uuid4().hex[:12]
+    with RENDER_LOCK:
+        RENDER_JOBS[job_id] = {
+            "id": job_id,
+            "status": "running",
+            "progress": 0,
+            "frame": 0,
+            "frames": int(settings.get("frames", 81) or 81),
+            "step": 0,
+            "settings": settings,
+            "created": time.time(),
+        }
+    t = threading.Thread(target=_run_render_job, args=(job_id, settings), daemon=True)
+    t.start()
+    return job_id
+
+
 def build_service_worker():
     """Service Worker that replays the e2b-traffic-access-token header.
 
@@ -1992,6 +2197,23 @@ HEADER_LOG = os.path.join(tempfile.gettempdir(), "wangp_preview_headers.jsonl")
 class PreviewHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         pass
+
+    # ---- POST: start a preview video render ----------------------------
+    def do_POST(self):
+        parsed = urllib.parse.urlparse(self.path)
+        if parsed.path != "/api/render":
+            self.send_response(404)
+            self.end_headers()
+            return
+        try:
+            length = int(self.headers.get("Content-Length", 0) or 0)
+            body = self.rfile.read(length).decode("utf-8") if length else "{}"
+            settings = json.loads(body or "{}")
+        except Exception as e:
+            self._send_json({"error": f"Bad request: {e}"}, 400)
+            return
+        job_id = start_render_job(settings)
+        self._send_json({"jobId": job_id, "status": "running"})
 
     def _record_headers(self):
         """The E2B proxy validates the traffic-access-token before the request reaches
@@ -2067,6 +2289,47 @@ class PreviewHandler(BaseHTTPRequestHandler):
                              'attachment; filename="WanGP_Studio_Standalone.html"')
             self.end_headers()
             self.wfile.write(raw)
+            return
+
+        if path == "/api/render/status":
+            qs = urllib.parse.parse_qs(parsed.query)
+            job_id = (qs.get("id", [""])[0] or "").strip()
+            with RENDER_LOCK:
+                job = RENDER_JOBS.get(job_id)
+                if not job:
+                    self._send_json({"status": "not_found"}, 404)
+                    return
+                self._send_json({
+                    "status": job["status"],
+                    "progress": job.get("progress", 0),
+                    "frame": job.get("frame", 0),
+                    "frames": job.get("frames", 0),
+                    "step": job.get("step", 0),
+                    "size": job.get("size", 0),
+                    "error": job.get("error", ""),
+                    "hasFile": bool(job.get("file")),
+                })
+            return
+
+        if path == "/api/render/file":
+            qs = urllib.parse.parse_qs(parsed.query)
+            job_id = (qs.get("id", [""])[0] or "").strip()
+            with RENDER_LOCK:
+                job = RENDER_JOBS.get(job_id)
+            if not job or not job.get("file") or not os.path.exists(job["file"]):
+                self.send_response(404)
+                self.end_headers()
+                return
+            with open(job["file"], "rb") as f:
+                data = f.read()
+            name = f"wangp_preview_{job_id}.mp4"
+            self.send_response(200)
+            self.send_header("Content-Type", "video/mp4")
+            self.send_header("Content-Length", str(len(data)))
+            self.send_header("Content-Disposition",
+                             f'attachment; filename="{name}"')
+            self.end_headers()
+            self.wfile.write(data)
             return
 
         if path.endswith("/api/models") or path == "/api/models":
