@@ -650,22 +650,35 @@ INDEX_HTML = r"""<!DOCTYPE html>
       <a class="btn btn-sm btn-success" href="WanGP_Colab_Free_GPU.ipynb" download="WanGP_Colab_Free_GPU.ipynb">
         ⚡ Download Free Colab GPU Launcher (.ipynb)
       </a>
-      <a class="btn btn-sm" id="openNewWinBtn" href="." target="_blank" rel="noopener" onclick="window.open(window.location.href, '_blank'); return false;" style="background:linear-gradient(135deg,#6366f1,#ec4899); font-weight:700;">
-        ↗ Open in New Window
+      <button class="btn btn-sm btn-secondary" onclick="toggleFullScreen()" title="Expand preview to fill your screen">
+        ⛶ Fullscreen
+      </button>
+      <button class="btn btn-sm btn-secondary" id="copyUrlBtn" onclick="copyDirectUrl()">
+        📋 Copy Direct URL
+      </button>
+      <a class="btn btn-sm" id="openNewWinBtn" href="https://7860-ippiwodbnc65hypshhaui.e2b.app/" target="_blank" rel="noopener noreferrer" style="background:linear-gradient(135deg,#6366f1,#ec4899); font-weight:700;">
+        ↗ Open in New Tab
       </a>
     </div>
   </header>
 
-  <!-- Iframe Fullscreen New-Window Prompt Banner -->
+  <!-- Iframe Fullscreen & Direct Link Banner -->
   <div id="iframeBanner" style="display:none; background:linear-gradient(90deg, rgba(99,102,241,0.22), rgba(236,72,153,0.22)); border-bottom:1px solid var(--accent); padding:9px 18px; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
-    <div style="font-size:0.86rem; font-weight:600;">
-      🖥️ Want the full-screen Studio view? Click the button to launch the WanGP Dashboard in its own browser window/tab:
+    <div style="font-size:0.84rem; font-weight:600; display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+      <span>🖥️ <b>Full Window URL:</b></span>
+      <input type="text" id="directUrlInput" value="https://7860-ippiwodbnc65hypshhaui.e2b.app/" readonly onclick="this.select()" style="width:320px; padding:4px 8px; font-size:0.8rem; font-family:monospace; background:#090d16; color:#6ee7b7; border:1px solid var(--accent);" />
     </div>
-    <div style="display:flex; gap:8px; align-items:center;">
-      <a class="btn btn-sm" href="." target="_blank" rel="noopener" onclick="window.open(window.location.href, '_blank'); return false;" style="background:var(--accent); font-weight:700; padding:7px 14px;">
-        ↗ Launch Fullscreen in New Window
+    <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+      <button class="btn btn-sm" onclick="toggleFullScreen()" style="background:var(--accent-2); color:#052e16; font-weight:700;">
+        ⛶ Expand Fullscreen Here
+      </button>
+      <button class="btn btn-sm btn-secondary" id="bannerCopyBtn" onclick="copyDirectUrl()">
+        📋 Copy URL
+      </button>
+      <a class="btn btn-sm" id="bannerOpenLink" href="https://7860-ippiwodbnc65hypshhaui.e2b.app/" target="_blank" rel="noopener noreferrer" style="background:var(--accent); font-weight:700;">
+        ↗ Open in New Tab
       </a>
-      <button class="btn btn-sm btn-secondary" onclick="document.getElementById('iframeBanner').style.display='none'">✕ Dismiss</button>
+      <button class="btn btn-sm btn-secondary" onclick="document.getElementById('iframeBanner').style.display='none'">✕</button>
     </div>
   </div>
 
@@ -1203,16 +1216,18 @@ let galleryItems = [
 ];
 
 async function initApp() {
-  // Detect if running inside an embedded preview iframe and offer/trigger new-window launch
+  const currentUrl = window.location.href;
+  const openBtn = document.getElementById('openNewWinBtn');
+  const bannerLink = document.getElementById('bannerOpenLink');
+  const urlInput = document.getElementById('directUrlInput');
+  if (openBtn) openBtn.href = currentUrl;
+  if (bannerLink) bannerLink.href = currentUrl;
+  if (urlInput) urlInput.value = currentUrl;
+
   try {
     if (window.self !== window.top) {
       const banner = document.getElementById('iframeBanner');
       if (banner) banner.style.display = 'flex';
-      // Attempt automatic open in new tab/window (if browser popup policy permits)
-      const w = window.open(window.location.href, '_blank');
-      if (w) {
-        w.focus();
-      }
     }
   } catch (e) {
     const banner = document.getElementById('iframeBanner');
@@ -1237,6 +1252,44 @@ async function initApp() {
   calcHardwareRecommendation();
   drawMaskCanvas();
   startIdleCanvasLoop();
+}
+
+function toggleFullScreen() {
+  const docEl = document.documentElement;
+  if (!document.fullscreenElement) {
+    if (docEl.requestFullscreen) {
+      docEl.requestFullscreen().catch(() => {});
+    }
+  } else {
+    if (document.exitFullscreen) {
+      document.exitFullscreen().catch(() => {});
+    }
+  }
+}
+
+function copyDirectUrl() {
+  const url = window.location.href;
+  const input = document.getElementById('directUrlInput');
+  if (input) {
+    input.value = url;
+    input.select();
+  }
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(url).then(() => {
+      const b1 = document.getElementById('copyUrlBtn');
+      const b2 = document.getElementById('bannerCopyBtn');
+      if (b1) b1.textContent = '✅ Copied URL!';
+      if (b2) b2.textContent = '✅ Copied!';
+      setTimeout(() => {
+        if (b1) b1.textContent = '📋 Copy Direct URL';
+        if (b2) b2.textContent = '📋 Copy URL';
+      }, 2200);
+    }).catch(() => {
+      document.execCommand('copy');
+    });
+  } else {
+    document.execCommand('copy');
+  }
 }
 
 function switchTab(tabId, btn) {
