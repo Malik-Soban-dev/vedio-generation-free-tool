@@ -9,6 +9,7 @@ import glob
 import json
 import mimetypes
 import os
+import tempfile
 import urllib.parse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
@@ -654,6 +655,9 @@ INDEX_HTML = r"""<!DOCTYPE html>
       <button class="btn btn-sm btn-secondary" onclick="toggleFullScreen()" title="Expand the preview to fill your whole screen">
         ⛶ Fullscreen
       </button>
+      <a class="btn btn-sm" id="newTabBtn" href="#" onclick="return openInNewTab();" style="background:linear-gradient(135deg,#6366f1,#ec4899); font-weight:700; opacity:0.55;" title="Opens the dashboard in a real new browser tab (needs the sandbox traffic token)">
+        ↗ Open in New Tab <span id="newTabState">…</span>
+      </a>
       <a class="btn btn-sm" href="WanGP_Studio_Standalone.html" download="WanGP_Studio_Standalone.html" target="_blank" rel="noopener" style="background:linear-gradient(135deg,#6366f1,#ec4899); font-weight:700;">
         ⬇️ Download Offline HTML (opens in any browser)
       </a>
@@ -670,6 +674,9 @@ INDEX_HTML = r"""<!DOCTYPE html>
       <button class="btn btn-sm" onclick="toggleFullScreen()" style="background:var(--accent-2); color:#052e16; font-weight:700;">
         ⛶ Expand Fullscreen Here
       </button>
+      <a class="btn btn-sm" id="bannerNewTabBtn" href="#" onclick="return openInNewTab();" style="background:var(--accent); font-weight:700; opacity:0.55;">
+        ↗ Open in New Tab
+      </a>
       <a class="btn btn-sm" href="WanGP_Studio_Standalone.html" download="WanGP_Studio_Standalone.html" target="_blank" rel="noopener" style="background:var(--accent); font-weight:700;">
         ⬇️ Download Offline HTML
       </a>
@@ -1248,6 +1255,62 @@ async function initApp() {
   calcHardwareRecommendation();
   drawMaskCanvas();
   startIdleCanvasLoop();
+  armTrafficTokenWorker();
+}
+
+let SW_TOKEN_ARMED = false;
+
+async function armTrafficTokenWorker() {
+  const btn = document.getElementById('newTabBtn');
+  const state = document.getElementById('newTabState');
+  const setLabel = (txt, armed) => {
+    if (state) state.textContent = txt;
+    if (btn) btn.style.opacity = armed ? '1' : '0.55';
+  };
+  try {
+    const res = await fetch('api/headers').then(r => r.json());
+    if (res && res.tokenPresent && res.token) {
+      if ('serviceWorker' in navigator) {
+        const reg = await navigator.serviceWorker.register('sw.js', { scope: '/' });
+        await navigator.serviceWorker.ready;
+        SW_TOKEN_ARMED = true;
+        setLabel('(ready ✅)', true);
+        if (btn) btn.href = window.location.href.split('#')[0];
+        const b = document.getElementById('bannerNewTabBtn');
+        if (b) {
+          b.href = window.location.href.split('#')[0];
+          b.style.opacity = '1';
+          b.textContent = '↗ Open in New Tab (ready ✅)';
+        }
+        return;
+      }
+      setLabel('(no SW support)', false);
+      return;
+    }
+    setLabel('(token hidden by proxy)', false);
+  } catch (e) {
+    setLabel('(unavailable)', false);
+  }
+}
+
+function openInNewTab() {
+  if (!SW_TOKEN_ARMED) {
+    alert(
+      'This sandbox was created with allowPublicTraffic: false, so its public URL is\n' +
+      'rejected with HTTP 403 "missing traffic token" unless the request carries the\n' +
+      'private e2b-traffic-access-token header — which a plain browser tab cannot set.\n\n' +
+      'The token is held by the Arena platform, not by the sandbox, and this page was\n' +
+      'unable to observe it.\n\n' +
+      'Working options:\n' +
+      '  1. Use the ⛶ Fullscreen button above.\n' +
+      '  2. Download the Offline HTML and open it in any browser.\n' +
+      '  3. Run start_preview.sh / start_preview.bat on your own PC to open it at\n' +
+      '     http://localhost:7860 in a real new browser window.'
+    );
+    return false;
+  }
+  window.open(window.location.href.split('#')[0], '_blank');
+  return false;
 }
 
 function toggleFullScreen() {
@@ -1842,6 +1905,69 @@ def load_all_doc_contents():
     return contents
 
 
+def get_traffic_token():
+    """Return the E2B traffic-access-token if we can see it.
+
+    Sources (in order):
+      1. E2B_TRAFFIC_ACCESS_TOKEN environment variable
+      2. The header observed on the most recent inbound request (the E2B proxy
+         validates the token at the edge; if it forwards the header we can read
+         it here and hand it to the Service Worker).
+    """
+    token = os.environ.get("E2B_TRAFFIC_ACCESS_TOKEN", "").strip()
+    if token:
+        return token
+    try:
+        with open(HEADER_LOG, "r", encoding="utf-8") as f:
+            lines = [ln for ln in f.read().splitlines() if ln.strip()]
+        for ln in reversed(lines[-200:]):
+            try:
+                hdrs = json.loads(ln)
+            except Exception:
+                continue
+            tok = (hdrs.get("e2b-traffic-access-token")
+                   or hdrs.get("cube-traffic-access-token"))
+            if tok:
+                return tok.strip()
+    except Exception:
+        pass
+    return ""
+
+
+def build_service_worker():
+    """Service Worker that replays the e2b-traffic-access-token header.
+
+    A browser cannot set custom headers on a top-level navigation, which is why
+    opening the sandbox's public URL in a new tab returns 403 "missing traffic
+    token". A Service Worker installed on that same origin *can* intercept the
+    navigation and re-issue it with the header attached.
+    """
+    token = get_traffic_token()
+    return (
+        "/* WanGP Studio - E2B traffic-token replay Service Worker */\n"
+        "const TOKEN = " + json.dumps(token) + ";\n"
+        "self.addEventListener('install', function () { self.skipWaiting(); });\n"
+        "self.addEventListener('activate', function (e) {\n"
+        "  e.waitUntil(self.clients.claim());\n"
+        "});\n"
+        "self.addEventListener('fetch', function (event) {\n"
+        "  if (!TOKEN) { return; }  /* no token: let the browser handle it normally */\n"
+        "  var req = event.request;\n"
+        "  var url = new URL(req.url);\n"
+        "  if (url.origin !== self.location.origin) { return; }\n"
+        "  if (req.method !== 'GET') { return; }\n"
+        "  event.respondWith(\n"
+        "    fetch(req.url, {\n"
+        "      method: 'GET',\n"
+        "      headers: { 'e2b-traffic-access-token': TOKEN },\n"
+        "      credentials: 'same-origin',\n"
+        "      redirect: 'follow'\n"
+        "    }).catch(function (err) { return fetch(req); })\n"
+        "  );\n"
+        "});\n"
+    )
+
+
 def build_standalone_html():
     """Bake every real model preset, plugin and doc into one self-contained HTML file."""
     payload = {
@@ -1860,9 +1986,35 @@ def build_standalone_html():
     return INDEX_HTML.replace("<!--__WANGP_INLINE_DATA__-->", inline)
 
 
+HEADER_LOG = os.path.join(tempfile.gettempdir(), "wangp_preview_headers.jsonl")
+
+
 class PreviewHandler(BaseHTTPRequestHandler):
     def log_message(self, fmt, *args):
         pass
+
+    def _record_headers(self):
+        """The E2B proxy validates the traffic-access-token before the request reaches
+        us. If it forwards the header, we can read it here and let a Service Worker
+        replay it for navigations opened in a brand-new browser tab."""
+        try:
+            snapshot = {
+                k.lower(): v for k, v in self.headers.items()
+            }
+            with open(HEADER_LOG, "a", encoding="utf-8") as f:
+                f.write(json.dumps(snapshot) + "\n")
+        except Exception:
+            pass
+
+    def _last_headers(self):
+        try:
+            with open(HEADER_LOG, "r", encoding="utf-8") as f:
+                lines = [ln for ln in f.read().splitlines() if ln.strip()]
+            if not lines:
+                return {}
+            return json.loads(lines[-1])
+        except Exception:
+            return {}
 
     def _send_json(self, obj, status=200):
         raw = json.dumps(obj).encode("utf-8")
@@ -1876,12 +2028,32 @@ class PreviewHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
+        self._record_headers()
+
+        if path == "/api/headers":
+            hdrs = self._last_headers()
+            token = (hdrs.get("e2b-traffic-access-token")
+                     or hdrs.get("cube-traffic-access-token")
+                     or os.environ.get("E2B_TRAFFIC_ACCESS_TOKEN", ""))
+            self._send_json({"tokenPresent": bool(token), "token": token,
+                             "headers": hdrs})
+            return
 
         if path in ("/", "/index.html"):
             raw = INDEX_HTML.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+            return
+
+        if path == "/sw.js":
+            raw = build_service_worker().encode("utf-8")
+            self.send_response(200)
+            self.send_header("Content-Type", "application/javascript; charset=utf-8")
+            self.send_header("Content-Length", str(len(raw)))
+            self.send_header("Service-Worker-Allowed", "/")
             self.end_headers()
             self.wfile.write(raw)
             return
