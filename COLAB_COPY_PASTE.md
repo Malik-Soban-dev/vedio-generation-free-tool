@@ -1,13 +1,24 @@
 # Colab — Copy & Paste Version (use this if the links didn't work)
 
-## Why the links didn't work
+## ✅ The one-click link works now (use this first)
 
-Your repository `Malik-Soban-dev/vedio-generation-free-tool` is **private**.
-Google Colab cannot read files from a private repo, so every
-`colab.research.google.com/github/...` link failed.
+Your repo was made **public** and the notebook was merged to `main`, so this link
+is now verified working:
+
+**https://colab.research.google.com/github/Malik-Soban-dev/vedio-generation-free-tool/blob/main/WanGP_Colab_Free_GPU.ipynb**
+
+Open it, then: **Runtime → Change runtime type → T4 GPU → Save**, then **Runtime → Run all**.
+
+---
+
+## Only use the copy-paste method below if that link ever breaks
+
+It exists because your repository used to be **private**, and Google Colab cannot
+read files from a private repo — so every `colab.research.google.com/github/...`
+link failed at the time.
 
 **Good news:** WanGP itself is a **public** project (`deepbeepmeep/WanGP`), so Colab
-can download it directly. You just need to paste the code below by hand.
+can download it directly either way.
 
 ---
 
