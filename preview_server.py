@@ -941,7 +941,7 @@ INDEX_HTML = r"""<!DOCTYPE html>
               </div>
               <div style="display:flex; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
                 <button class="btn btn-sm btn-secondary" onclick="copyGpuCommand()">📋 Copy Command</button>
-                <a class="btn btn-sm btn-success" href="https://colab.research.google.com/github/Malik-Soban-dev/vedio-generation-free-tool/blob/arena/f01df44c-vedio-generation-free-tool/WanGP_Colab_Free_GPU.ipynb" target="_blank" rel="noopener">
+                <a class="btn btn-sm btn-success" href="https://colab.research.google.com/github/Malik-Soban-dev/vedio-generation-free-tool/blob/main/WanGP_Colab_Free_GPU.ipynb" target="_blank" rel="noopener">
                   ⚡ Open Free Colab GPU Notebook
                 </a>
               </div>

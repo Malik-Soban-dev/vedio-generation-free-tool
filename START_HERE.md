@@ -12,7 +12,7 @@ powerful graphics card (GPU), which you can borrow **for free from Google**.
 
 **Step 1.** Click this link:
 
-https://colab.research.google.com/github/Malik-Soban-dev/vedio-generation-free-tool/blob/arena/f01df44c-vedio-generation-free-tool/WanGP_Colab_Free_GPU.ipynb
+https://colab.research.google.com/github/Malik-Soban-dev/vedio-generation-free-tool/blob/main/WanGP_Colab_Free_GPU.ipynb
 
 **Step 2.** In the Colab menu click **Runtime → Run all**.
 (If it asks "Run anyway?", click it.)
