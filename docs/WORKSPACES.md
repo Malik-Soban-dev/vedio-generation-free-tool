@@ -1,0 +1,204 @@
+# Gallery Workspaces
+
+Gallery workspaces help you separate and organize media for different projects. Each workspace remembers which images, videos, and audio files appear in WanGP's galleries, which item is selected, and which gallery tab was open.
+
+Use workspaces when you want to:
+
+- keep unrelated projects out of each other's galleries
+- return to a useful media collection after restarting WanGP
+- give a Deepy session its own collection of source files and results
+- browse more media than the main gallery displays at once
+- move, copy, package, or remove groups of gallery items
+
+## What a workspace saves
+
+A workspace saves the state of the **Image / Video Gallery** and **Audio Gallery**, including:
+
+- the ordered list of media in each gallery
+- the selected image/video and selected audio
+- whether the selection was following the latest result
+- the active gallery tab
+- the selected video time, when available
+
+**Shared Output Folders** is the default storage mode. These workspaces store references to the original media files:
+
+- the same file can appear in more than one workspace without using additional disk space
+- copying an item to another workspace adds another reference, not another file
+- deleting a workspace removes the collection but leaves its media files on disk
+- moving or deleting a referenced file outside WanGP makes it unavailable when the workspace is restored
+
+This is different from a **Deepy Prime session workspace**, which is a real folder where Prime can create drafts, plans, prompts, and other project files. A dedicated Deepy session may have both: a private file workspace for working documents and a gallery workspace for media.
+
+### Dedicated media folders
+
+In **Configuration > Outputs**, set **Default Storage for New Workspaces** to **Dedicated Folder per Workspace** to give new workspaces independent media folders. Images, videos, audio and 3D outputs go into that workspace's folder. Imports and copies from other workspaces create independent files, including known companion files. This uses more disk space but makes projects easier to back up independently. Existing workspaces keep their current mode.
+
+The **Shared Video/Image/Audio/3D Output Folder** fields remain visible: existing shared workspaces continue using them even when new workspaces use dedicated folders.
+
+**Workspaces Root** contains the workspace definitions and the default dedicated folders. New folders use the workspace name, with a number such as **My Project (2)** only when necessary. Characters that cannot be used in filenames are replaced. Renaming a workspace updates its name and JSON filename while keeping its media folder stable. **Folder** in the workspace selector identifies dedicated storage.
+
+Open the manager's **Shared Storage / Folder Storage** button to convert an existing workspace. The preview shows media/file counts and size. Converting to dedicated storage copies and verifies files, retaining the originals. Missing media must be restored first. Converting back to shared references keeps existing files in place; subsequent generations use the shared output folders. Finish or clear queued work before converting.
+
+Gallery Manager shows **Shared references** or **Dedicated folder**. Dedicated workspaces display their full server folder path. Use **Change Folder**, enter an absolute folder path on the WanGP server, preview the copy, then choose **Copy and Use Folder**. WanGP copies and verifies the gallery media and companion files, switches future outputs and agent file access to the new location, and retains the originals. Existing target files are preserved; unrelated files are not added to the gallery. Agents assigned to the workspace can access the target folder’s contents. A target cannot overlap another workspace’s folder. Finish or clear queued jobs first. Custom folders can be outside Workspaces Root and must be backed up separately.
+
+Folders do not automatically populate galleries: use Import to add files. Ejected files stay on disk without reappearing. Deleting or archiving a workspace always retains its media folder.
+
+## Create and switch workspaces
+
+The workspace selector is beside the gallery tabs in Gradio and in the gallery header of the Deepy Web app.
+
+- Select a workspace to replace both galleries with its saved collection.
+- Click **+** to create a new, empty workspace.
+- Rename an ordinary workspace when its project changes.
+- Delete an ordinary workspace when you no longer need the collection. Its media files stay on disk.
+
+If every workspace is removed, WanGP creates a new empty **Default** workspace. Ordinary workspace names must be unique.
+
+Workspace selection and gallery changes are synchronized across open Gradio pages and the Deepy Web app. Generations and imports made on one page appear in the active workspace on the others. Wait for active Deepy work and generation to finish before creating, deleting, or switching a workspace.
+
+## How workspaces connect to galleries
+
+The active workspace owns the gallery lists, order, and selections. New generated or imported media are added to that active collection. Selecting, reordering, ejecting, or importing media updates the workspace automatically; there is no Save Workspace button.
+
+**Configuration > General > Media Visible per Gallery** controls how many of the newest items appear in the normal galleries. It does not remove older items from the workspace. Choose **All** (`0`) to show the complete collection in the main galleries, or use a smaller number to keep large galleries responsive.
+
+When only the latest items are visible:
+
+- older items remain saved in their original order
+- ejecting a visible item brings the next older item back into view
+- generating new media does not discard earlier results
+- the workspace manager can browse and manage the complete collection
+
+If the latest item is selected, a new output becomes the selection automatically. If you intentionally selected an older item, WanGP keeps that selection and viewing position.
+
+## Use the workspace manager
+
+In Gradio, click the **magnifier** beside the workspace selector to open the full-screen workspace manager. The manager is not available in the compact Deepy Web app.
+
+Switch between **Images / Videos** and **Audio**. The grid is ordered from oldest to newest. Items marked **In gallery** are among the newest items currently shown in the normal gallery; every other item is still part of the workspace.
+
+Select an item to view its available generation properties. For video, use the play control to inspect it. The manager loads large collections in pages, so you can organize a workspace without displaying every original media file at once.
+
+### Select several items
+
+- Click a tile to select it.
+- Ctrl-click on Windows/Linux or Cmd-click on macOS to toggle individual items.
+- Shift-click to select a range on the current page.
+- Drag a rectangle from empty space between tiles to select an area.
+- Use **Select page** to select every item on the displayed page.
+
+Selections remain active while moving between pages.
+
+### Reorder media
+
+Drag a selected tile to move the entire selection before another item. While dragging, hover over a page arrow to move to another page, then drop the selection at its destination. Use **Move to start** or **Move to end** for large collections.
+
+Order matters because the normal gallery shows the last N items in workspace order. Reordering therefore changes which items receive the **In gallery** badge and appear in the compact gallery.
+
+### Workspace actions
+
+- **Eject** removes the selected entries from the current workspace but leaves their files on disk. Use this to clean up a collection safely.
+- **Copy to workspace** adds references to a shared destination or independent file copies to a dedicated destination.
+- **Move to workspace** performs the same destination import, then ejects the source entries. Original files remain on disk for other collections that may reference them.
+- **ZIP** downloads selected media and known companions together, without re-encoding.
+- **Import** copies uploads into the workspace's dedicated folder or the configured shared output folder. Original filenames are preserved when possible. Reimporting the same file reuses it; a different file with the same name receives a numbered suffix.
+- **Delete files** permanently deletes the selected files and removes their references from every workspace. It requires confirmation and waits for Deepy and generation to become idle. Use **Eject** instead unless the files themselves should be erased.
+
+Deleting a file is the only workspace-manager action that removes the underlying media from disk.
+
+## Deepy sessions and workspaces
+
+Deepy's multisession setting controls how saved conversations use gallery workspaces:
+
+- **Multisessions with selectable Workspace** associates the conversation with the ordinary workspace chosen in Deepy's own workspace selector, or with the workspace shown when the conversation starts working. Browsing another workspace in the main gallery does not move the conversation. Use this when several sessions should share or switch among common media collections.
+- **Multisessions with dedicated Workspace** creates a separate gallery workspace for each conversation. Use this when every Deepy project should stay self-contained.
+
+Dedicated workspaces display a robot icon; ordinary workspaces display a folder icon. In dedicated mode, Deepy's Web gallery is locked to its current session workspace. The main Gradio gallery may browse another workspace, but Deepy's next import or request returns its media workflow to the dedicated collection.
+
+A dedicated workspace is owned by its Deepy session:
+
+- rename the session to rename its workspace
+- delete the session to delete its workspace record
+- resume the session to restore its workspace and media references
+- manage the session rather than trying to rename or delete its workspace directly
+
+Deleting a Deepy session or dedicated workspace does not delete the referenced media files. Session media portability is a separate choice: **Keep links to Gallery files** relies on the originals, while **Copy Gallery files into each session** keeps session-owned copies. See [Deepy sessions and workspaces](DEEPY.md#sessions-and-workspaces).
+
+Session assignment and media storage are separate choices. A session-owned workspace may use either storage mode. With dedicated media storage, Deepy's output filesystem root is that workspace's folder. Prime retains a separate writable folder for documents and drafts, and existing output files retain their create-only protection. Explicit selected-folder and Read Everywhere permissions still apply.
+
+## MCP agent workspaces
+
+**Configuration > Agents > MCP Agent Workspace** offers two choices: **Use Selected Workspace** gives agents the workspace selected in the gallery when the first agent call arrives, and keeps it even if you browse elsewhere afterwards; **Create a Workspace per Agent** automatically gives each agent its own workspace. Agents can still explicitly create or choose another workspace. New workspaces use the storage mode selected in Outputs. Existing workspaces keep their own storage mode until explicitly converted in Gallery Manager. Restart after changing agent assignment.
+
+Agents can query existing workspaces, create one, attach to an existing one, or resume an earlier context with `wangp_workspace`. Each connection gets its own automatic assignment. Clients multiplexing several logical agents must pass a separate returned `agent_context` on their calls. Keep this ID to resume after reconnecting; disconnecting does not delete files.
+
+You can keep using WanGP while agents work: their generations and media edits are added to the agent's workspace without switching the workspace, gallery or gallery tab you are viewing. If you open that workspace meanwhile, new agent media appears in it as it is created. Agents can also edit or analyze media while a generation is running. You can switch workspaces during an agent generation, but not during your own generation or a Deepy action. A workspace cannot be deleted while an agent is adding media to it.
+
+This keeps agents out of your view, not out of your collections: when you ask an agent to work in a particular workspace, it attaches to that workspace and its media goes there. **Configuration > Agents > Workspaces Agents Can See** decides which workspaces agents can list and work in:
+
+- **Their Own Workspaces**: only the workspaces the agent was given or created.
+- **Their Own and Your Workspaces** (default): also the ordinary workspaces you created.
+- **All Workspaces**: also your Deepy conversation workspaces, named after your requests, and other agents' workspaces.
+
+The setting applies immediately, without restart. It also governs your selection: an agent asked about "the selected image" reads what you selected in the gallery you are viewing, when it may see that workspace. Browsing, reading media settings, inspecting media, discovery, file IO and job polling never change your view either, and media an agent adds never become your selection. Deepy's workspace association is not affected by agents, and Deepy still switches the gallery to its own workspace when it works.
+
+These are organizational boundaries, not private accounts. The current shared-user policy still permits workspace discovery/attachment, common queue visibility and cancellation of other agents' queued jobs. More granular permissions are planned separately.
+
+## Synchronization between pages
+
+The Deepy Web app and all open Gradio pages share workspace selection, gallery contents, media order, and selections while connected to the same WanGP process. A change on one page is reflected on the others.
+
+Each Gradio page's unsent generation form remains independent. Changing the model, prompt, or input fields on one page does not rewrite another page's draft. Workspaces synchronize completed generations and gallery state, not unfinished form entries.
+
+In dedicated-session mode, the Deepy Web gallery deliberately continues to show its session-owned workspace even if someone browses another workspace in Gradio.
+
+## Last activity, protection, and automatic archiving
+
+The workspace manager displays **Last Activity**, based on the most recent media addition, removal, or reorder. Merely viewing, selecting, renaming, or protecting a workspace does not make it active again.
+
+Click the **lock** to protect an important workspace from automatic archiving. Click the **broom** to choose how long an unlocked workspace may remain inactive: one to three weeks, one to eleven months, one year, or disabled.
+
+Archiving runs when WanGP starts; it is not a background cleanup timer. When an unlocked workspace is older than the selected period:
+
+- the workspace disappears from active selectors
+- its media files remain at their original locations
+- a dedicated Deepy session associated with it is also hidden from the active session list
+
+**Recommendation:** leave automatic archiving disabled until you have established a cleanup routine. If you enable it, lock every active or long-term project.
+
+### Restore an archived workspace
+
+There is currently no restore button. To restore one manually:
+
+1. Stop WanGP.
+2. Open the configured workspace folder, normally `workspaces/`.
+3. Move the workspace JSON file from `workspaces/archives/` back into `workspaces/` without overwriting another file.
+4. Set `archive_protected` to `true` in that JSON so it is not archived again at the next startup.
+5. For a dedicated workspace, remove `archived_at` from the matching Deepy session's `session.json`.
+6. Restart WanGP.
+
+The workspace and session reappear if their referenced media still exist.
+
+## Storage and backups
+
+Workspace definitions are stored under **Configuration > Outputs > Workspaces Root**, normally `workspaces/`, with readable filenames such as `My Project.json`. Names receive a numbered suffix only when needed. On upgrade, existing workspace JSON files, including archived ones, are renamed automatically. Existing dedicated media folders and workspace associations remain unchanged. Deepy session folders receive readable names separately; links from shared workspaces follow the session.
+
+Missing files and unavailable Deepy sessions are skipped when opening a gallery. Saving the gallery retains those references, so restoring the files or session makes them available again when you reopen the workspace. The manager also handles files that disappear while it is open. Storage conversion reports missing media and waits for it to be restored; it does not silently discard it. Explicitly deleting media through the manager still removes its references.
+
+`--workspaces-dir FOLDER` overrides the configured root for Gradio, Deepy Web and standalone MCP. Move the complete root before changing its location and restart WanGP. Include archives and agent context records.
+
+A backup of the complete root includes dedicated workspace media. Shared workspaces still reference files elsewhere: back up those folders separately. Relative paths keep dedicated media usable when the complete root is relocated. Deepy conversations and their document folders have their own session storage and backup requirements. For selected media, the manager's **ZIP** action is the simpler option.
+
+## Recommended workflows
+
+- **Quick experiments:** use one ordinary workspace and eject rejected results periodically.
+- **Separate client or creative projects:** create one ordinary workspace per project and give each a clear name.
+- **Long Deepy productions:** use multisessions with dedicated workspaces so conversation context and gallery media stay aligned.
+- **Shared source library:** use selectable workspaces and copy references into project workspaces without duplicating files.
+- **Small main galleries:** set a modest **Media Visible per Gallery** value and use the manager for older media.
+- **Safe cleanup:** eject first; use permanent deletion only after confirming the same files are not needed by another workspace.
+- **Long-term retention:** protect the workspace, and back up both its definition and its referenced media.
+
+---
+
+> Applies to: Creating, selecting, synchronizing, managing, archiving, restoring, and backing up WanGP gallery workspaces; their relationship to galleries, media files, Deepy sessions, and the Gradio workspace manager.
